@@ -7,7 +7,10 @@ from navigation import (
     blh_to_xyz,
     body_to_neu,
     neu_to_body,
+    neu_to_blh,
+    neu_to_xyz,
     xyz_to_blh,
+    xyz_to_neu,
 )
 
 
@@ -26,7 +29,7 @@ def save_visualization(wuhan_xyz, local_neu, vector_neu):
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#334155"/></marker></defs>
 <rect width="1000" height="560" fill="#f1f5f9"/>
 <g font-family="Microsoft YaHei,Arial" fill="#1e293b">
-<text x="40" y="50" font-size="26" font-weight="bold">导航常用坐标系转换结果</text>
+<text x="40" y="50" font-size="26" font-weight="bold">导航常用坐标系转换结果（示意）</text>
 
 <rect x="30" y="80" width="300" height="430" rx="12" fill="white" stroke="#cbd5e1"/>
 <text x="50" y="120" font-size="20" font-weight="bold">1. BLH → XYZ</text>
@@ -52,6 +55,7 @@ def save_visualization(wuhan_xyz, local_neu, vector_neu):
 
 <rect x="670" y="80" width="300" height="430" rx="12" fill="white" stroke="#cbd5e1"/>
 <text x="690" y="120" font-size="20" font-weight="bold">3. Body → NEU</text>
+<text x="690" y="150" font-size="14">向量的水平投影（N、E）</text>
 <circle cx="805" cy="310" r="5" fill="#1e293b"/>
 <line x1="805" y1="310" x2="805" y2="175" stroke="#2563eb" stroke-width="3" marker-end="url(#arrow)"/>
 <line x1="805" y1="310" x2="930" y2="310" stroke="#16a34a" stroke-width="3" marker-end="url(#arrow)"/>
@@ -81,9 +85,13 @@ def main():
     local_neu = blh_to_neu(target_blh, wuhan_blh)
     print("\n2. BLH 与 NEU 转换")
     show("NEU / m", local_neu, 4)
+    show("回算 BLH", neu_to_blh(local_neu, wuhan_blh), 9)
+    target_xyz = blh_to_xyz(*target_blh)
+    show("XYZ -> NEU / m", xyz_to_neu(target_xyz, wuhan_blh), 4)
+    show("NEU -> XYZ / m", neu_to_xyz(local_neu, wuhan_blh), 4)
 
     # 3. 载体系与地理坐标系转换
-    vector_body = (1.0, 0.2, 0.1)
+    vector_body = (1.0, 0.2, 0.1)  # 右、前、上分量
     attitude = (35.0, 5.0, -3.0)  # 偏航角、俯仰角、横滚角
     vector_neu = body_to_neu(vector_body, *attitude)
     print("\n3. 载体系与 NEU 转换")

@@ -2,6 +2,7 @@
 
 BLH 中纬度和经度使用度，大地高及直角坐标使用米。
 NEU 的分量顺序为北、东、天。
+载体系采用右、前、上，姿态角采用 Lecture 2 第 90 页的 Z-X-Y 顺序。
 """
 
 from math import atan, atan2, cos, degrees, hypot, radians, sin, sqrt
@@ -52,6 +53,8 @@ def xyz_to_blh(x, y, z):
 
     # 极点处 p=0，需要单独计算
     if p < 1e-9:
+        if abs(z) < 1e-9:
+            raise ValueError("地心处无法确定大地纬度和经度")
         latitude = 90.0 if z >= 0 else -90.0
         return latitude, 0.0, abs(z) - B_AXIS
 
@@ -68,7 +71,11 @@ def xyz_to_blh(x, y, z):
 
     latitude = atan(tan_b)
     n = A / sqrt(1 - E2 * sin(latitude) ** 2)
-    height = p / cos(latitude) - n
+    # 高纬度时 cos(B) 很小，改用 Z 方程求高，避免除以接近零的数。
+    if abs(latitude) <= radians(45):
+        height = p / cos(latitude) - n
+    else:
+        height = z / sin(latitude) - n * (1 - E2)
     return degrees(latitude), degrees(longitude), height
 
 
@@ -117,7 +124,11 @@ def neu_to_blh(point_neu, origin_blh):
 
 
 def _body_to_neu_matrix(yaw_deg, pitch_deg, roll_deg):
-    """讲义第 90 页的 Z-X-Y 欧拉角旋转矩阵。"""
+    """由讲义第 90 页的 Z-X-Y 矩阵得到 Body（右前上）到 NEU 的矩阵。
+
+    讲义的坐标轴旋转矩阵 A 将 ENU 分量转为载体系分量。
+    先转置得到 Body -> ENU，再交换前两行得到 Body -> NEU。
+    """
 
     psi = radians(yaw_deg)       # 偏航角
     theta = radians(pitch_deg)   # 俯仰角
@@ -126,22 +137,27 @@ def _body_to_neu_matrix(yaw_deg, pitch_deg, roll_deg):
     st, ct = sin(theta), cos(theta)
     sg, cg = sin(gamma), cos(gamma)
 
-    return (
+    enu_to_body = (
         (cg * cp + sg * st * sp, -cg * sp + sg * st * cp, -sg * ct),
         (ct * sp, ct * cp, st),
         (sg * cp - cg * st * sp, -sg * sp - cg * st * cp, cg * ct),
     )
+    body_to_enu = _transpose(enu_to_body)
+    return body_to_enu[1], body_to_enu[0], body_to_enu[2]
 
 
 def body_to_neu(vector_body, yaw_deg, pitch_deg, roll_deg):
-    """载体系向量转为 NEU 向量。"""
+    """右前上载体系向量转 NEU；航向北起顺时针，俯仰抬头为正，横滚右倾为正。
+
+    两个坐标系原点重合，只旋转向量；零姿态时载体前向指北、右向指东。
+    """
 
     matrix = _body_to_neu_matrix(yaw_deg, pitch_deg, roll_deg)
     return _mat_vec(matrix, vector_body)
 
 
 def neu_to_body(vector_neu, yaw_deg, pitch_deg, roll_deg):
-    """NEU 向量转为载体系向量。"""
+    """NEU 向量转为右前上载体系向量，角度约定与 body_to_neu 相同。"""
 
     matrix = _body_to_neu_matrix(yaw_deg, pitch_deg, roll_deg)
     return _mat_vec(_transpose(matrix), vector_neu)
